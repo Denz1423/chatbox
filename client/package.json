@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "npm run dev",
+    "start": "concurrently \"npm run tailwind\" \"npm run dev\"",
     "tailwind": "npx tailwindcss -i ./src/index.css -o ./dist/output.css --watch",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -14,6 +14,7 @@
   "dependencies": {
     "autoprefixer": "^10.4.16",
     "axios": "^1.5.0",
+    "concurrently": "^8.2.1",
     "lodash": "^4.17.21",
     "postcss": "^8.4.30",
     "react": "^18.2.0",

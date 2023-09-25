@@ -1,12 +1,15 @@
 import { useEffect, useState, useContext, useRef } from "react";
 import { uniqBy } from "lodash";
+import axios from "axios";
 import { UserContext } from "../context/userContext";
 import Avatar from "./avatar";
+import Contact from "./contact";
 import Logo from "../assets/logo";
 
 export default function Chat() {
   const [ws, setWs] = useState(null);
   const [onlinePeople, setOnlinePeople] = useState({});
+  const [offlinePeople, setOfflinePeople] = useState({});
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [newMessageText, setNewMessageText] = useState("");
   const [messages, setMessages] = useState([]);
@@ -14,10 +17,15 @@ export default function Chat() {
   const divUndermessages = useRef();
 
   useEffect(() => {
+    connectToWs();
+  }, []);
+
+  function connectToWs() {
     const ws = new WebSocket("ws://localhost:4000");
     setWs(ws);
     ws.addEventListener("message", handleMessage);
-  }, []);
+    ws.addEventListener("close", () => connectToWs);
+  }
 
   function showOnlinePeople(peopleArray) {
     const people = {};
@@ -56,7 +64,7 @@ export default function Chat() {
         text: newMessageText,
         sender: id,
         recipient: selectedUserId,
-        id: Date.now(),
+        _id: Date.now(),
       },
     ]);
   }
@@ -68,10 +76,31 @@ export default function Chat() {
     }
   }, [messages]);
 
+  useEffect(() => {
+    axios.get("/people").then((res) => {
+      const offlinePeopleArr = res.data
+        .filter((p) => p._id !== id)
+        .filter((p) => !Object.keys(onlinePeople).includes(p._id));
+      const offlinePeople = {};
+      offlinePeopleArr.forEach((p) => {
+        offlinePeople[p._id] = p;
+      });
+      setOfflinePeople(offlinePeople);
+    });
+  }, [onlinePeople]);
+
+  useEffect(() => {
+    if (selectedUserId) {
+      axios.get("/messages/" + selectedUserId).then((res) => {
+        setMessages(res.data);
+      });
+    }
+  }, [selectedUserId]);
+
   const onlinePeopleExclOurUser = { ...onlinePeople };
   delete onlinePeopleExclOurUser[id];
 
-  const messagesWithoutDupes = uniqBy(messages, "id");
+  const messagesWithoutDupes = uniqBy(messages, "_id");
 
   return (
     <div className="flex h-screen">
@@ -79,22 +108,27 @@ export default function Chat() {
         <Logo />
         {Object.keys(onlinePeopleExclOurUser).map((userId) => {
           return (
-            <div
+            <Contact
               key={userId}
-              onClick={() => setSelectedUserId(userId)}
-              className={
-                "border-b border-gray-300  flex items-center gap-2 cursor-pointer " +
-                (userId === selectedUserId ? "bg-blue-50" : "")
-              }
-            >
-              {userId === selectedUserId && (
-                <div className="w-1 bg-blue-500 h-12 rounded-r-md"></div>
-              )}
-              <div className="flex gap-2 py-2 pl-4 items-center">
-                <Avatar username={onlinePeople[userId]} userId={userId} />
-                <span className="text-grey-800">{onlinePeople[userId]}</span>
-              </div>
-            </div>
+              userId={userId}
+              username={onlinePeopleExclOurUser[userId]}
+              onclick={() => setSelectedUserId(userId)}
+              selected={userId === selectedUserId}
+              online={true}
+            />
+          );
+        })}
+
+        {Object.keys(offlinePeople).map((userId) => {
+          return (
+            <Contact
+              key={userId}
+              userId={userId}
+              username={offlinePeople[userId].username}
+              onclick={() => setSelectedUserId(userId)}
+              selected={userId === selectedUserId}
+              online={false}
+            />
           );
         })}
       </div>
@@ -113,7 +147,7 @@ export default function Chat() {
                     className={
                       message.sender === id ? "text-right" : "text-left"
                     }
-                    key={message.id}
+                    key={message._id}
                   >
                     <div
                       className={

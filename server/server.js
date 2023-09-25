@@ -24,6 +24,24 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
+async function getUserDataFromRequest(req) {
+  return new Promise((resolve, reject) => {
+    const token = req.cookies?.token;
+    if (token) {
+      jwt.verify(token, jwbSecret, {}, (err, userData) => {
+        if (err) {
+          console.log(err);
+          next();
+        }
+        resolve(userData);
+      });
+    } else {
+      reject("No token");
+      next();
+    }
+  });
+}
+
 app.get("/profile", (req, res, next) => {
   const token = req.cookies?.token;
   if (token) {
@@ -39,6 +57,22 @@ app.get("/profile", (req, res, next) => {
     next();
   }
 });
+
+app.get("/messages/:userId", async (req, res) => {
+  const { userId } = req.params;
+  const userData = await getUserDataFromRequest(req);
+  const ourUserId = userData.userId;
+  const messages = await Message.find({
+    sender: { $in: [userId, ourUserId] },
+    recipient: { $in: [userId, ourUserId] },
+  }).sort({ createdAt: 1 });
+  res.json(messages);
+});
+
+app.get("/people", async (req, res) => {
+  const users = await User.find({}, {'_id': 1, username: 1});
+  res.json(users);
+})
 
 app.post("/login", async (req, res, next) => {
   const { username, password } = req.body;
@@ -156,7 +190,7 @@ wss.on("connection", (connection, req) => {
               text,
               sender: connection.userId,
               recipient: recipient,
-              id: messageDoc._id,
+              _id: messageDoc._id,
             })
           )
         );
