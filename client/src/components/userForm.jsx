@@ -5,20 +5,27 @@ import { UserContext } from "../context/userContext";
 export default function UserForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isRegistered, setIsRegistered] = useState(false);
   const { setLoggedInUsername, setId } = useContext(UserContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const url = isRegistered === false ? '/register' : '/login';
-    const { data } = await axios.post(url, { username, password });
-    setLoggedInUsername(username);
-    setId(data.id);
+
+    try {
+      const url = isRegistered === false ? "/register" : "/login";
+      const { data } = await axios.post(url, { username, password });
+      setLoggedInUsername(username);
+      setId(data.id);
+    } catch (error) {
+      setError(error.response.data.error);
+    }
   };
 
   return (
     <div className="bg-blue-100 h-screen flex flex-col justify-center items-center">
       <h1 className="text-4xl p-2 mb-2">Chatbox</h1>
+      {error !== "" ? <span className="text-red-700">{error}</span> : ""}
       <form className="w-64 mx-auto mb-12" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -38,21 +45,23 @@ export default function UserForm() {
           }}
           className="block w-full rounded-sm p-2 mb-2 border"
         />
-        <button className="bg-blue-500 text-white block w-full rounded-sm p-2">
+        <button type="submit" className="bg-blue-500 text-white block w-full rounded-sm p-2">
           {isRegistered ? "Login" : "Register"}
         </button>
-        <div className="text-center mt-2">
-          {!isRegistered ? "Already have an account?" : "Don't have an account?"}
-          <button
-            onClick={() => {
-              setIsRegistered(!isRegistered);
-            }}
-            className="text-blue-700 ml-1"
-          >
-            {isRegistered ? "Register" : "Login"}
-          </button>
-        </div>
       </form>
+      <div className="text-center">
+        {!isRegistered ? "Already have an account?" : "Don't have an account?"}
+        <button
+          onClick={() => {
+            setIsRegistered(!isRegistered);
+            setError("");
+          }}
+          className="text-blue-700 ml-1"
+          type="button"
+        >
+          {isRegistered ? "Register" : "Login"}
+        </button>
+      </div>
     </div>
   );
 }

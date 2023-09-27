@@ -70,9 +70,9 @@ app.get("/messages/:userId", async (req, res) => {
 });
 
 app.get("/people", async (req, res) => {
-  const users = await User.find({}, {'_id': 1, username: 1});
+  const users = await User.find({}, { _id: 1, username: 1 });
   res.json(users);
-})
+});
 
 app.post("/login", async (req, res, next) => {
   const { username, password } = req.body;
@@ -103,12 +103,17 @@ app.post("/login", async (req, res, next) => {
   }
 });
 
+app.post('/logout', (req, res) => {
+  res.cookie("token", '').json('ok');
+})
+
 app.post("/register", async (req, res, next) => {
   const { username, password } = req.body;
 
   try {
     const foundUser = await User.findOne({ username });
 
+    //New User
     if (!foundUser) {
       const hashPassword = bcrypt.hashSync(password, bcryptSalt);
       const createdUser = await User.create({
@@ -121,7 +126,6 @@ app.post("/register", async (req, res, next) => {
         {},
         (err, token) => {
           if (err) {
-            console.log(err);
             res.status(500);
             next();
           }
@@ -129,9 +133,10 @@ app.post("/register", async (req, res, next) => {
         }
       );
     } else {
+      //User already exist
       res
         .status(409)
-        .json({ success: false, error: "Username already exist!" });
+        .json({ error: "Username already exist!" });
       return;
     }
   } catch (error) {
@@ -150,6 +155,35 @@ const server = app.listen(port, () => {
 const wss = new ws.WebSocketServer({ server });
 
 wss.on("connection", (connection, req) => {
+  function notifyAboutOnlinePeople() {
+    [...wss.clients].forEach((client) => {
+      client.send(
+        JSON.stringify({
+          online: [...wss.clients].map((c) => ({
+            userId: c.userId,
+            username: c.username,
+          })),
+        })
+      );
+    });
+  }
+
+  connection.isAlive = true;
+
+  connection.timer = setInterval(() => {
+    connection.ping();
+    connection.deathTimer = setTimeout(() => {
+      connection.isAlive = false;
+      clearInterval(connection.timer);
+      connection.terminate();
+      notifyAboutOnlinePeople();
+    }, 1000);
+  }, 5000);
+
+  connection.on("pong", () => {
+    clearTimeout(connection.deathTimer);
+  });
+
   //Read username and id from the cookie for current connection
   const cookies = req.headers.cookie;
   if (cookies) {
@@ -198,14 +232,6 @@ wss.on("connection", (connection, req) => {
   });
 
   //Notify everyone about online people (when someone connects)
-  [...wss.clients].forEach((client) => {
-    client.send(
-      JSON.stringify({
-        online: [...wss.clients].map((c) => ({
-          userId: c.userId,
-          username: c.username,
-        })),
-      })
-    );
-  });
+  notifyAboutOnlinePeople();
 });
+
