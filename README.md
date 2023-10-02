@@ -24,6 +24,7 @@ Chat page:
 
 ## Setup
 To run this project, fork a copy of the project then:
+(Note that a mongoDB account & a .env file containing the mongoDB URI and JWT_SECRET string is required)
 
 To start the frontend:
 ```
